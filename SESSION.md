@@ -15,7 +15,7 @@ across the four use cases.
 | UC-0A | Complaint Classifier | ✅ Built · `results_[city].csv` produced for all 4 cities |
 | UC-0B | Summary That Changes Meaning | ✅ Built · `summary_hr_leave.txt` produced |
 | UC-0C | Number That Looks Right | ✅ Built · `growth_output.csv` produced |
-| UC-X | Ask My Documents | ⏳ Not started |
+| UC-X | Ask My Documents | ✅ Built · all 7 test questions pass |
 
 Data files confirmed present:
 `data/city-test-files/`, `data/policy-documents/`, `data/budget/ward_budget.csv`.
@@ -148,6 +148,60 @@ exit 2 with a refusal message.
 
 ---
 
+## UC-X — Ask My Documents
+
+Files:
+- `uc-x/agents.md` — RICE spec (role, intent, context, enforcement)
+- `uc-x/skills.md` — `retrieve_documents` + `answer_question`
+- `uc-x/app.py` — implementation (interactive CLI + `--ask "..."`)
+
+**How to run:**
+```bash
+cd uc-x
+python app.py                          # interactive
+python app.py --ask "Who approves leave without pay?"
+```
+
+**How it works:**
+- `retrieve_documents` parses all three policy files into clauses and builds
+  an IDF table over clause tokens (rare words carry more evidence)
+- `answer_question` scores clauses with one-word-one-term matching: an exact
+  match counts in full, a synonym match half, and each clause word backs only
+  one question term (so `device` cannot count for both `mobile` and `phone`)
+- Single-source rule — every quoted clause in an answer comes from the same
+  document, cited as `Source: <doc> - section <n>`; a rival clause from
+  another document scoring within 90% of the best triggers the refusal
+  template instead of a blend
+- Refusal template returned verbatim for uncovered questions; a built answer
+  is asserted free of hedging phrases
+
+**Enforcement (verified):** never combines claims across documents; never
+uses hedging phrases (`while not explicitly covered`, `typically`,
+`generally understood`, `it is common practice`); uncovered questions use the
+exact refusal template; every factual claim cites document + section.
+
+**Verification — all 7 README test questions:**
+- Carry forward → HR 2.6 · Slack install → IT 2.3 · Home office allowance →
+  Finance 3.1 · Personal phone from home → IT 3.1 + 3.2 (single source, NOT
+  blended) · Flexible working culture → refusal template · DA + meal receipts
+  same day → Finance 2.5 + 2.6 (simultaneous claim prohibited) · Leave without
+  pay approval → HR 5.2 + 5.3 (Department Head AND HR Director)
+
+**CRAFT loop — what failed on the naive prompt → what changed:**
+- *Cross-document blending:* the personal-phone question tempted a blend of
+  "personal devices (IT 3.1)" with anything mentioning approved remote work.
+  → The single-document rule plus the 90% rival-document refusal threshold
+  make a blend structurally impossible.
+- *Shared-word bleed:* a lone word like `home` or `device` could drag in a
+  wrong clause. → Synonym matches count at half weight, one clause word backs
+  one question term only, and a best clause with fewer than 2 distinct
+  non-generic evidence terms is refused.
+- *Hedged hallucination:* without a required output format the model drifts to
+  "while not explicitly covered...". → The exact refusal template is wired in
+  and every built answer is asserted free of hedging phrases.
+
+---
+
 ## Commit log (workshop formula)
 
 Every change below follows the official formula:
@@ -175,4 +229,10 @@ the 5 blank actual_spend rows and treated them as zero → per-ward per-category
 only (aggregate words refused, exit 2), null rows flagged with their notes
 reason and PRIOR_NULL_FLAGGED after each gap, --growth-type required, formula
 shown per row
+
+[UC-X] Fix cross-document blending on the personal-phone question: shared words
+let IT/Finance clauses outrank the real answer → clause index with IDF scoring,
+one-word-one-term matching, single-document answers with section citations,
+rival-document tie (within 90%) → exact refusal template, hedging phrases
+blocked
 ```
