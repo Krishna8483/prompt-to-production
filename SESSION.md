@@ -14,7 +14,7 @@ across the four use cases.
 |----|-------------|--------|
 | UC-0A | Complaint Classifier | ✅ Built · `results_[city].csv` produced for all 4 cities |
 | UC-0B | Summary That Changes Meaning | ✅ Built · `summary_hr_leave.txt` produced |
-| UC-0C | Number That Looks Right | ⏳ Not started |
+| UC-0C | Number That Looks Right | ✅ Built · `growth_output.csv` produced |
 | UC-X | Ask My Documents | ⏳ Not started |
 
 Data files confirmed present:
@@ -100,6 +100,54 @@ softened binding verbs.
 
 ---
 
+## UC-0C — Number That Looks Right
+
+Files:
+- `uc-0c/agents.md` — RICE spec (role, intent, context, enforcement)
+- `uc-0c/skills.md` — `load_dataset` + `compute_growth`
+- `uc-0c/app.py` — implementation
+- `uc-0c/growth_output.csv` — generated output (Ward 1 – Kasba / Roads &
+  Pothole Repair plus the 5 (ward, category) pairs that contain a null row)
+
+**How to run:**
+```bash
+cd uc-0c
+python app.py --input ../data/budget/ward_budget.csv \
+  --ward "Ward 1 – Kasba" --category "Roads & Pothole Repair" \
+  --growth-type MoM --output growth_output.csv
+```
+
+**Enforcement (verified, refusals run before any computation):**
+- Per-ward per-category only — `--ward` and `--category` are repeatable and
+  paired positionally; a missing `--growth-type`, `--ward`/`--category`, or any
+  aggregate word (`all`, `total`, `combined`, `every`, ...) is refused with
+  exit code 2
+- Unknown ward/category names are refused with a list of valid alternatives
+- Every null `actual_spend` row is `NULL_FLAGGED` with its notes reason; the
+  following month is `PRIOR_NULL_FLAGGED` instead of being computed against a gap
+- The growth formula is shown in every output row alongside the result
+- Status column: `OK` | `NULL_FLAGGED` | `PRIOR_NULL_FLAGGED` |
+  `NO_PRIOR_PERIOD` | `DIVIDE_BY_ZERO`
+
+**Verification:** reference values reproduce — Ward 1 – Kasba / Roads &
+Pothole Repair 2024-07 `(19.7 - 14.8) / 14.8 = +33.1%`, 2024-10
+`(13.1 - 20.1) / 20.1 = -34.8%`. All 5 null rows flagged; the period after each
+null is `PRIOR_NULL_FLAGGED`; `--ward all` and missing `--growth-type` both
+exit 2 with a refusal message.
+
+**CRAFT loop — what failed on the naive prompt → what changed:**
+- *Silent aggregation:* a naive sum across all wards looks coherent and hides
+  the 5 empty cells — a naive result treats those blanks as zero, which turns
+  neighbouring months into fake spikes and drops. → Aggregation is refused
+  outright; growth is only ever computed per explicit (ward, category) pair.
+- *Null skipping:* a naive loop computes around blank cells and never mentions
+  them. → `load_dataset` reports the 5 null rows up front, null rows carry the
+  notes reason, and the month after a null is flagged `PRIOR_NULL_FLAGGED`.
+- *Formula guessing:* MoM vs YoY changes every number. → `--growth-type` is
+  required; the formula is printed per row so the reader can verify it.
+
+---
+
 ## Commit log (workshop formula)
 
 Every change below follows the official formula:
@@ -121,4 +169,10 @@ commit log section using the workshop formula with both change entries
 sections 5.1-5.4 were silently dropped → broadened the regex and added a
 29-clause coverage check plus a per-clause token-preservation pass
 (conditions dropped → verbatim + [VERBATIM] flag)
+
+[UC-0C] Fix silent aggregation + null skipping: a single all-ward number hid
+the 5 blank actual_spend rows and treated them as zero → per-ward per-category
+only (aggregate words refused, exit 2), null rows flagged with their notes
+reason and PRIOR_NULL_FLAGGED after each gap, --growth-type required, formula
+shown per row
 ```
