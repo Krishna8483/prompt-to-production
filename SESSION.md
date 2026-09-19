@@ -12,7 +12,7 @@ across the four use cases.
 
 | UC | Deliverable | Status |
 |----|-------------|--------|
-| UC-0A | Complaint Classifier | ✅ Built · `results_pune.csv` produced |
+| UC-0A | Complaint Classifier | ✅ Built · `results_[city].csv` produced for all 4 cities |
 | UC-0B | Summary That Changes Meaning | ⏳ Not started |
 | UC-0C | Number That Looks Right | ⏳ Not started |
 | UC-X | Ask My Documents | ⏳ Not started |
@@ -31,6 +31,7 @@ Files:
 - `uc-0a/skills.md` — `classify_complaint` + `batch_classify`
 - `uc-0a/classifier.py` — implementation
 - `uc-0a/results_pune.csv` — generated output (15 rows)
+  plus `results_hyderabad.csv`, `results_kolkata.csv`, `results_ahmedabad.csv`
 
 **How to run:**
 ```bash
@@ -63,9 +64,17 @@ consistency, reason presence, flag validity) passes all 15 rows with 0 errors.
 
 ---
 
-## Suggested commit (per workshop standard)
+## Commit log (workshop formula)
+
+Every change below follows the official formula:
+`[UC-ID] Fix [what]: [why it failed] → [what you changed]`
 
 ```
-[UC-0A] Fix ambiguity blindness: heritage-context and category ties were resolved
-with false confidence → added NEEDS_REVIEW flagging + strict severity enforcement
+[UC-0A] Fix ambiguity blindness: heritage-context and category ties were
+classified with false confidence → added NEEDS_REVIEW flagging + strict
+severity keyword enforcement
+
+[UC-0A] Fix missing city coverage: only Pune output existed → ran the
+classifier on Hyderabad, Kolkata, and Ahmedabad test files; all rows pass
+the rule check
 ```
