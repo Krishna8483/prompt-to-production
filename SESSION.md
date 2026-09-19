@@ -13,7 +13,7 @@ across the four use cases.
 | UC | Deliverable | Status |
 |----|-------------|--------|
 | UC-0A | Complaint Classifier | ✅ Built · `results_[city].csv` produced for all 4 cities |
-| UC-0B | Summary That Changes Meaning | ⏳ Not started |
+| UC-0B | Summary That Changes Meaning | ✅ Built · `summary_hr_leave.txt` produced |
 | UC-0C | Number That Looks Right | ⏳ Not started |
 | UC-X | Ask My Documents | ⏳ Not started |
 
@@ -64,6 +64,42 @@ consistency, reason presence, flag validity) passes all 15 rows with 0 errors.
 
 ---
 
+## UC-0B — Summary That Changes Meaning
+
+Files:
+- `uc-0b/agents.md` — RICE spec
+- `uc-0b/skills.md` — `retrieve_policy` + `summarize_policy`
+- `uc-0b/app.py` — implementation
+- `uc-0b/summary_hr_leave.txt` — generated output (all 29 clauses)
+
+**How to run:**
+```bash
+cd uc-0b
+python app.py --input ../data/policy-documents/policy_hr_leave.txt --output summary_hr_leave.txt
+```
+
+**Enforcement (verified):**
+- Clause coverage — every numbered clause (1.1–8.2 = 29) must appear in output; missing summaries raise a fatal error
+- Condition preservation — per-clause token check (timeframes, approvers, amounts, prohibitions) fails → clause written verbatim and flagged `[VERBATIM]`
+- No invented info — scope-bleed phrases (`as is standard practice`, `typically in government`, ...) are detected and refused
+- Binding verbs (`must`/`will`/`requires`/`not permitted`) are never softened
+
+**Verification:** checker confirms 29/29 source clauses present, zero extra
+clauses, zero scope-bleed phrases, zero `[VERBATIM]` fallbacks needed, and no
+softened binding verbs.
+
+**CRAFT loop — what failed on the naive prompt → what changed:**
+- *Clause omission:* the first section parser rejected `5. LEAVE WITHOUT PAY (LWP)`
+  because the title regex only allowed letters — sections 5.1–5.4 were silently
+  dropped (25 of 29 clauses). → Broadened the title regex to allow parentheses
+  and digits; coverage now forces all 29 clauses.
+- *Condition dropping:* a plain rephrase could drop "Department Head AND HR
+  Director" or "within 48 hours". → Added a token-preservation pass that proves
+  every mandatory condition survived; violations are quoted verbatim with
+  `[VERBATIM]` instead of silently weakening.
+
+---
+
 ## Commit log (workshop formula)
 
 Every change below follows the official formula:
@@ -77,4 +113,12 @@ severity keyword enforcement
 [UC-0A] Fix missing city coverage: only Pune output existed → ran the
 classifier on Hyderabad, Kolkata, and Ahmedabad test files; all rows pass
 the rule check
+
+[UC-0A] Fix session log: commit history not documented in README → added
+commit log section using the workshop formula with both change entries
+
+[UC-0B] Fix clause omission: section-title regex rejected "(LWP)" so
+sections 5.1-5.4 were silently dropped → broadened the regex and added a
+29-clause coverage check plus a per-clause token-preservation pass
+(conditions dropped → verbatim + [VERBATIM] flag)
 ```
